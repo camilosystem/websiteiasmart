@@ -69,9 +69,12 @@ export function EditorProvider({
   const saveConfig = useCallback(async () => {
     setIsSaving(true)
     try {
-      setConfig((prev) => {
-        saveEditorConfig(prev)
-        return prev
+      // Read current config from functional updater so we always have the latest
+      await new Promise<void>((resolve) => {
+        setConfig((prev) => {
+          saveEditorConfig(prev).then(resolve)
+          return prev
+        })
       })
       setIsDirty(false)
     } finally {
