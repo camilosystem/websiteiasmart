@@ -1,7 +1,19 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react'
 import { EditorConfig, defaultEditorConfig } from '@/lib/editor-defaults'
+import {
+  getEditorConfig,
+  saveEditorConfig,
+  resetEditorConfig,
+} from '@/app/actions/editor-actions'
 
 interface EditorContextType {
   config: EditorConfig
@@ -9,11 +21,10 @@ interface EditorContextType {
   resetConfig: () => void
   saveConfig: () => void
   isDirty: boolean
+  isSaving: boolean
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
-
-const STORAGE_KEY = 'iasmart_editor_config'
 
 function setNestedValue(obj: any, path: string, value: any): any {
   const keys = path.split('.')
@@ -29,47 +40,60 @@ function setNestedValue(obj: any, path: string, value: any): any {
   return result
 }
 
-export function EditorProvider({ children }: { children: ReactNode }) {
-  const [config, setConfig] = useState<EditorConfig>(defaultEditorConfig)
+export function EditorProvider({
+  children,
+  initialConfig,
+}: {
+  children: ReactNode
+  initialConfig?: EditorConfig
+}) {
+  const [config, setConfig] = useState<EditorConfig>(
+    initialConfig ?? defaultEditorConfig
+  )
   const [isDirty, setIsDirty] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
+  // If no SSR initial config was provided, hydrate from KV on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        setConfig({ ...defaultEditorConfig, ...parsed })
-      }
-    } catch {
-      // silently fall back to defaults
-    }
-  }, [])
+    if (initialConfig) return
+    getEditorConfig().then((remote) => {
+      setConfig({ ...defaultEditorConfig, ...remote })
+    })
+  }, [initialConfig])
 
   const updateConfig = useCallback((path: string, value: any) => {
-    setConfig(prev => setNestedValue(prev, path, value))
+    setConfig((prev) => setNestedValue(prev, path, value))
     setIsDirty(true)
   }, [])
 
-  const saveConfig = useCallback(() => {
+  const saveConfig = useCallback(async () => {
+    setIsSaving(true)
     try {
-      setConfig(prev => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(prev))
+      setConfig((prev) => {
+        saveEditorConfig(prev)
         return prev
       })
       setIsDirty(false)
-    } catch {
-      // ignore storage errors
+    } finally {
+      setIsSaving(false)
     }
   }, [])
 
-  const resetConfig = useCallback(() => {
-    setConfig(defaultEditorConfig)
-    localStorage.removeItem(STORAGE_KEY)
-    setIsDirty(false)
+  const resetConfig = useCallback(async () => {
+    setIsSaving(true)
+    try {
+      await resetEditorConfig()
+      setConfig(defaultEditorConfig)
+      setIsDirty(false)
+    } finally {
+      setIsSaving(false)
+    }
   }, [])
 
   return (
-    <EditorContext.Provider value={{ config, updateConfig, resetConfig, saveConfig, isDirty }}>
+    <EditorContext.Provider
+      value={{ config, updateConfig, resetConfig, saveConfig, isDirty, isSaving }}
+    >
       {children}
     </EditorContext.Provider>
   )

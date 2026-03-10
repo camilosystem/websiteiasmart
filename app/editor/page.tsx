@@ -26,10 +26,11 @@ import {
   Save,
   RotateCcw,
   ExternalLink,
-  ChevronLeft,
+  LogOut,
   Monitor,
   Smartphone,
 } from 'lucide-react'
+import { logoutAction } from '@/app/actions/auth-actions'
 
 type Tab = 'logo' | 'colors' | 'menu' | 'sections' | 'code'
 
@@ -44,7 +45,7 @@ const tabs: { key: Tab; label: string; Icon: any }[] = [
 export default function EditorPage() {
   const [activeTab, setActiveTab] = useState<Tab>('logo')
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
-  const { saveConfig, resetConfig, isDirty } = useEditor()
+  const { saveConfig, resetConfig, isDirty, isSaving } = useEditor()
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -62,13 +63,15 @@ export default function EditorPage() {
             <span className="text-sm font-bold">Editor</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronLeft className="w-3 h-3" />
-              Salir
-            </Link>
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <LogOut className="w-3 h-3" />
+                Salir
+              </button>
+            </form>
           </div>
         </div>
 
@@ -104,10 +107,10 @@ export default function EditorPage() {
           <Button
             onClick={saveConfig}
             className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-            disabled={!isDirty}
+            disabled={!isDirty || isSaving}
           >
             <Save className="w-4 h-4" />
-            {isDirty ? 'Guardar cambios' : 'Sin cambios pendientes'}
+            {isSaving ? 'Guardando...' : isDirty ? 'Guardar cambios' : 'Sin cambios pendientes'}
           </Button>
           <Button
             variant="outline"
